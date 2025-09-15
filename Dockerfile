@@ -3,12 +3,18 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
+# Install OpenSSL
+RUN apk add --no-cache openssl
+
 # Copy package files
 COPY package*.json ./
 COPY prisma ./prisma/
 
 # Install dependencies
 RUN npm ci
+
+# Generate Prisma client with correct binary target
+RUN npx prisma generate
 
 # Copy source code
 COPY . .
@@ -21,8 +27,8 @@ FROM node:20-alpine AS runner
 
 WORKDIR /app
 
-# Install dumb-init for proper signal handling
-RUN apk add --no-cache dumb-init
+# Install dumb-init and OpenSSL for Prisma
+RUN apk add --no-cache dumb-init openssl
 
 # Create non-root user
 RUN addgroup -g 1001 -S nodejs && \
@@ -33,6 +39,7 @@ COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 
 # Set user
 USER nextjs
